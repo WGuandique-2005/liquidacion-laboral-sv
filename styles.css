@@ -57,6 +57,11 @@
   color: #9a9689;
   cursor: not-allowed;
 }
+.field-input:read-only {
+  background: #F3F6F4;
+  border-color: #bcd7cd;
+  color: #1B2A4A;
+}
 
 .field-hint {
   font-size: 0.6875rem;
@@ -234,12 +239,14 @@
 .legal-warning strong { color: #1B2A4A; }
 
 .print-only { display: none; }
+.print-only-text { display: none; }
 
 /* ---------- Print ---------- */
 @media print {
   [data-no-print] { display: none !important; }
   body { background: #fff; }
   .print-only { display: block !important; }
+  .print-only-text { display: inline !important; }
   #resultado { margin-top: 0 !important; }
   #print-area { padding: 0; }
   .doc-h3:first-of-type { margin-top: 0; }

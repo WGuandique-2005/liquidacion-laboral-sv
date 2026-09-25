@@ -5,6 +5,8 @@
  * Convención: mes comercial = 30 días, año comercial = 360 días,
  * jornada ordinaria = 8 horas (misma convención usada por los Juzgados de lo Laboral).
  *
+ * Las fórmulas del Bloque II (prestaciones) no se modifican al agregar
+ * el Bloque III (deducciones de ley) — ver nota al final del archivo.
  */
 
 const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
@@ -29,6 +31,55 @@ document.querySelectorAll('[data-skip]').forEach((checkbox) => {
     if (checkbox.checked) input.value = 0;
   });
 });
+
+const aniosInput = document.getElementById('anios');
+const mesesInput = document.getElementById('meses');
+const mesesHint = document.getElementById('meses-hint');
+const fechaIngresoInput = document.getElementById('fechaIngreso');
+const fechaTerminacionInput = document.getElementById('fechaTerminacion');
+
+/**
+ * Antigüedad exacta (años, meses, días de calendario) entre dos fechas ISO.
+ * Devuelve null si faltan datos o si la terminación no es posterior al ingreso.
+ */
+function diffFechas(isoIngreso, isoTerminacion) {
+  if (!isoIngreso || !isoTerminacion) return null;
+  const ingreso = new Date(isoIngreso + 'T00:00:00');
+  const term = new Date(isoTerminacion + 'T00:00:00');
+  if (isNaN(ingreso) || isNaN(term) || term <= ingreso) return null;
+
+  let anios = term.getFullYear() - ingreso.getFullYear();
+  let meses = term.getMonth() - ingreso.getMonth();
+  let dias = term.getDate() - ingreso.getDate();
+
+  if (dias < 0) {
+    meses -= 1;
+    const ultimoDiaMesAnterior = new Date(term.getFullYear(), term.getMonth(), 0).getDate();
+    dias += ultimoDiaMesAnterior;
+  }
+  if (meses < 0) {
+    anios -= 1;
+    meses += 12;
+  }
+  return { anios, meses, dias };
+}
+
+function sincronizarAntiguedadPorFechas() {
+  const calc = diffFechas(fechaIngresoInput.value, fechaTerminacionInput.value);
+  if (calc) {
+    aniosInput.value = calc.anios;
+    mesesInput.value = calc.meses;
+    aniosInput.readOnly = true;
+    mesesInput.readOnly = true;
+    mesesHint.textContent = `Calculado de las fechas: ${calc.anios} años, ${calc.meses} meses y ${calc.dias} días.`;
+  } else {
+    aniosInput.readOnly = false;
+    mesesInput.readOnly = false;
+    mesesHint.textContent = 'Fracción del año actual (0–11)';
+  }
+}
+fechaIngresoInput.addEventListener('change', sincronizarAntiguedadPorFechas);
+fechaTerminacionInput.addEventListener('change', sincronizarAntiguedadPorFechas);
 
 function showError(message) {
   errorBox.textContent = message;
@@ -133,13 +184,22 @@ form.addEventListener('submit', (e) => {
   const nombreTrabajador = document.getElementById('nombreTrabajador').value.trim();
   const patrono = document.getElementById('patrono').value.trim();
   const cargo = document.getElementById('cargo').value.trim();
-  const fechaIngreso = document.getElementById('fechaIngreso').value;
-  const fechaTerminacion = document.getElementById('fechaTerminacion').value;
+  const fechaIngreso = fechaIngresoInput.value;
+  const fechaTerminacion = fechaTerminacionInput.value;
 
   const salario = parseFloat(document.getElementById('salario').value);
-  const anios = parseInt(document.getElementById('anios').value, 10);
-  const meses = parseInt(document.getElementById('meses').value, 10);
   const causa = document.querySelector('input[name="causa"]:checked').value;
+
+  // Si ambas fechas son válidas, la antigüedad (incluyendo días) se calcula de ellas
+  // y tiene prioridad sobre los campos manuales de años/meses.
+  const fechasValidas = fechaIngreso && fechaTerminacion;
+  if (fechasValidas && !diffFechas(fechaIngreso, fechaTerminacion)) {
+    return showError('La fecha de terminación debe ser posterior a la fecha de ingreso.');
+  }
+  const antiguedadPorFechas = diffFechas(fechaIngreso, fechaTerminacion);
+  const anios = antiguedadPorFechas ? antiguedadPorFechas.anios : parseInt(aniosInput.value, 10);
+  const meses = antiguedadPorFechas ? antiguedadPorFechas.meses : parseInt(mesesInput.value, 10);
+  const diasExtra = antiguedadPorFechas ? antiguedadPorFechas.dias : 0;
 
   // --- II. Jornadas extraordinarias ---
   const heDiurnas = parseFloat(document.getElementById('heDiurnas').value) || 0;
@@ -159,7 +219,7 @@ form.addEventListener('submit', (e) => {
   // --- Salario básico diario y por hora ---
   const SBD = salario / 30;
   const H = SBD / 8;
-  const fraccionAnio = meses / 12;
+  const fraccionAnio = (meses * 30 + diasExtra) / 360;
   const antiguedadTotal = anios + fraccionAnio;
 
   /* =========================================================
@@ -249,7 +309,9 @@ form.addEventListener('submit', (e) => {
   document.getElementById('r-salario').textContent = fmt.format(salario);
   document.getElementById('r-fechaIngreso').textContent = fechaIngreso ? fmtDate(fechaIngreso) : '— No especificada —';
   document.getElementById('r-fechaTerminacion').textContent = fechaTerminacion ? fmtDate(fechaTerminacion) : '— No especificada —';
-  document.getElementById('r-antiguedad').textContent = `${anios} años, ${meses} meses`;
+  document.getElementById('r-antiguedad').textContent = diasExtra > 0
+    ? `${anios} años, ${meses} meses, ${diasExtra} días`
+    : `${anios} años, ${meses} meses`;
   document.getElementById('r-causaLabel2').textContent = causa === 'despido' ? 'Despido injustificado' : 'Renuncia voluntaria';
 
   /* =========================================================
@@ -298,3 +360,11 @@ form.addEventListener('submit', (e) => {
 });
 
 document.getElementById('btn-print').addEventListener('click', () => window.print());
+
+/**
+ * Nota: las fórmulas de vacación, aguinaldo, indemnización/renuncia, horas
+ * extras, asueto y descanso semanal (Bloque II) son idénticas a las de la
+ * versión anterior de esta calculadora. El Bloque III solo agrega, sobre el
+ * mismo resultado ya calculado, la separación entre renta gravada/exenta y
+ * las deducciones de ISSS, AFP e ISR para obtener el monto neto a pagar.
+ */

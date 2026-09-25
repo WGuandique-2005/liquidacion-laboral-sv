@@ -79,6 +79,7 @@
         <div>
           <label for="fechaTerminacion" class="field-label">Fecha de terminación</label>
           <input type="date" id="fechaTerminacion" class="field-input">
+          <p class="field-hint">Si completas ambas fechas, la antigüedad (años, meses y días exactos) se calcula sola y reemplaza los campos de abajo.</p>
         </div>
       </div>
 
@@ -100,7 +101,7 @@
           <label for="meses" class="field-label">Meses laborados</label>
           <input type="number" id="meses" min="0" max="11" step="1" required placeholder="0"
             class="field-input">
-          <p class="field-hint">Fracción del año actual (0–11)</p>
+          <p class="field-hint" id="meses-hint">Fracción del año actual (0–11)</p>
         </div>
       </div>
 
@@ -189,7 +190,7 @@
   <!-- COMPROBANTE -->
   <section id="resultado" class="hidden mt-12">
     <div class="flex items-center justify-between border-b-2 border-ink pb-3 mb-1" data-no-print>
-      <h2 class="section-title !mt-0">Comprobante de liquidación</h2>
+      <h2 class="section-title !mt-0">Resultado del cálculo</h2>
       <button id="btn-print" class="text-xs font-medium text-seal hover:text-seal-dark underline underline-offset-2">Imprimir / Guardar PDF</button>
     </div>
 
@@ -199,28 +200,30 @@
         <h3 class="font-serif text-xl font-semibold">Comprobante de liquidación de prestaciones laborales</h3>
       </div>
 
-      <!-- I. DATOS DE LAS PARTES -->
-      <h3 class="doc-h3">I. Datos de las partes</h3>
-      <dl class="kv-grid">
-        <div class="kv"><dt>Persona trabajadora</dt><dd id="r-nombreTrabajador">—</dd></div>
-        <div class="kv"><dt>Patrono</dt><dd id="r-patrono">—</dd></div>
-        <div class="kv"><dt>Cargo desempeñado</dt><dd id="r-cargo">—</dd></div>
-        <div class="kv"><dt>Salario mensual</dt><dd id="r-salario">—</dd></div>
-        <div class="kv"><dt>Fecha de ingreso</dt><dd id="r-fechaIngreso">—</dd></div>
-        <div class="kv"><dt>Fecha de terminación</dt><dd id="r-fechaTerminacion">—</dd></div>
-        <div class="kv"><dt>Antigüedad reconocida</dt><dd id="r-antiguedad">—</dd></div>
-        <div class="kv"><dt>Causa de terminación</dt><dd id="r-causaLabel2">—</dd></div>
-      </dl>
+      <!-- I. DATOS DE LAS PARTES (solo en la versión impresa/PDF) -->
+      <div class="print-only">
+        <h3 class="doc-h3">I. Datos de las partes</h3>
+        <dl class="kv-grid">
+          <div class="kv"><dt>Persona trabajadora</dt><dd id="r-nombreTrabajador">—</dd></div>
+          <div class="kv"><dt>Patrono</dt><dd id="r-patrono">—</dd></div>
+          <div class="kv"><dt>Cargo desempeñado</dt><dd id="r-cargo">—</dd></div>
+          <div class="kv"><dt>Salario mensual</dt><dd id="r-salario">—</dd></div>
+          <div class="kv"><dt>Fecha de ingreso</dt><dd id="r-fechaIngreso">—</dd></div>
+          <div class="kv"><dt>Fecha de terminación</dt><dd id="r-fechaTerminacion">—</dd></div>
+          <div class="kv"><dt>Antigüedad reconocida</dt><dd id="r-antiguedad">—</dd></div>
+          <div class="kv"><dt>Causa de terminación</dt><dd id="r-causaLabel2">—</dd></div>
+        </dl>
+      </div>
 
-      <!-- II. DESGLOSE DE PRESTACIONES LIQUIDADAS -->
-      <h3 class="doc-h3">II. Desglose de prestaciones liquidadas</h3>
+      <!-- II. DESGLOSE DE PRESTACIONES LIQUIDADAS (Panel de Resultados — visible en pantalla e impresión) -->
+      <h3 class="doc-h3 print-only">II. Desglose de prestaciones liquidadas</h3>
       <dl class="divide-y divide-line">
         <div class="ledger-row">
-          <dt>Vacación proporcional<span class="legal-ref">Arts. 177 y 187 CT</span></dt>
+          <dt>Vacación proporcional acumulada<span class="legal-ref">Arts. 177 y 187 CT</span></dt>
           <dd id="r-vacacion">—</dd>
         </div>
         <div class="ledger-row">
-          <dt>Aguinaldo proporcional<span class="legal-ref">Arts. 196–198 CT</span></dt>
+          <dt>Aguinaldo proporcional acumulado<span class="legal-ref">Arts. 196–198 CT</span></dt>
           <dd id="r-aguinaldo">—</dd>
         </div>
         <div class="ledger-row">
@@ -228,11 +231,11 @@
           <dd id="r-causa">—</dd>
         </div>
         <div class="ledger-row">
-          <dt>Horas extras diurnas<span class="legal-ref">Art. 169 CT</span></dt>
+          <dt>Subtotal horas extras diurnas<span class="legal-ref">Art. 169 CT</span></dt>
           <dd id="r-heDiurnas">—</dd>
         </div>
         <div class="ledger-row">
-          <dt>Horas extras nocturnas<span class="legal-ref">Arts. 168 y 169 CT</span></dt>
+          <dt>Subtotal horas extras nocturnas<span class="legal-ref">Arts. 168 y 169 CT</span></dt>
           <dd id="r-heNocturnas">—</dd>
         </div>
         <div class="ledger-row">
@@ -245,49 +248,52 @@
         </div>
       </dl>
       <div class="total-row">
-        <span>Total devengado (bruto)</span>
+        <span><span data-no-print>Monto total de la liquidación</span><span class="print-only-text">Total devengado (bruto)</span></span>
         <span id="r-total">—</span>
       </div>
       <p id="r-nota" class="text-xs text-slate2 mt-3"></p>
 
-      <!-- III. DEDUCCIONES DE LEY Y NETO A PAGAR -->
-      <h3 class="doc-h3">III. Deducciones de ley y neto a pagar</h3>
-      <p class="text-xs text-slate2 leading-relaxed mb-3">
-        Remuneración gravada: <span id="r-gravada" class="font-medium text-ink">—</span>.
-        Monto exento de ISR y de cotizaciones: <span id="r-exento" class="font-medium text-ink">—</span>
-        (<span id="r-exento-nota">indemnización y aguinaldo</span>).
-      </p>
-      <dl class="divide-y divide-line">
-        <div class="ledger-row">
-          <dt>Cotización ISSS (trabajador)<span class="legal-ref">Reglamento del ISSS, Art. 29</span></dt>
-          <dd id="r-isss">—</dd>
+      <!-- III. DEDUCCIONES DE LEY Y NETO A PAGAR (solo en la versión impresa/PDF) -->
+      <div class="print-only">
+        <h3 class="doc-h3">III. Deducciones de ley y neto a pagar</h3>
+        <p class="text-xs text-slate2 leading-relaxed mb-3">
+          Remuneración gravada: <span id="r-gravada" class="font-medium text-ink">—</span>.
+          Monto exento de ISR y de cotizaciones: <span id="r-exento" class="font-medium text-ink">—</span>
+          (<span id="r-exento-nota">indemnización y aguinaldo</span>).
+        </p>
+        <dl class="divide-y divide-line">
+          <div class="ledger-row">
+            <dt>Cotización ISSS (trabajador)<span class="legal-ref">Reglamento del ISSS, Art. 29</span></dt>
+            <dd id="r-isss">—</dd>
+          </div>
+          <div class="ledger-row">
+            <dt>Cotización AFP (trabajador)<span class="legal-ref">Ley del Sistema de Ahorro para Pensiones</span></dt>
+            <dd id="r-afp">—</dd>
+          </div>
+          <div class="ledger-row">
+            <dt>Retención de ISR<span class="legal-ref">Art. 37 Ley de ISR</span></dt>
+            <dd id="r-isr">—</dd>
+          </div>
+        </dl>
+        <div class="total-row total-row--sub">
+          <span>Total de deducciones</span>
+          <span id="r-deducciones">—</span>
         </div>
-        <div class="ledger-row">
-          <dt>Cotización AFP (trabajador)<span class="legal-ref">Ley del Sistema de Ahorro para Pensiones</span></dt>
-          <dd id="r-afp">—</dd>
+        <div class="total-row">
+          <span>Monto neto a pagar</span>
+          <span id="r-neto">—</span>
         </div>
-        <div class="ledger-row">
-          <dt>Retención de ISR<span class="legal-ref">Art. 37 Ley de ISR</span></dt>
-          <dd id="r-isr">—</dd>
-        </div>
-      </dl>
-      <div class="total-row total-row--sub">
-        <span>Total de deducciones</span>
-        <span id="r-deducciones">—</span>
+        <p id="r-neto-letras" class="text-xs italic text-slate2 mt-2">—</p>
       </div>
-      <div class="total-row">
-        <span>Monto neto a pagar</span>
-        <span id="r-neto">—</span>
-      </div>
-      <p id="r-neto-letras" class="text-xs italic text-slate2 mt-2">—</p>
 
-      <!-- IV. DECLARACIÓN -->
-      <h3 class="doc-h3">IV. Declaración</h3>
-      <p id="r-declaracion" class="text-sm leading-relaxed text-ink"></p>
+      <!-- IV. DECLARACIÓN (solo en la versión impresa/PDF) -->
+      <div class="print-only">
+        <h3 class="doc-h3">IV. Declaración</h3>
+        <p id="r-declaracion" class="text-sm leading-relaxed text-ink"></p>
 
-      <div class="grid sm:grid-cols-2 gap-8 mt-8">
-        <div class="sig-block">
-          <p class="sig-title">Persona trabajadora</p>
+        <div class="grid sm:grid-cols-2 gap-8 mt-8">
+          <div class="sig-block">
+            <p class="sig-title">Persona trabajadora</p>
           <p class="sig-line">Nombre: <span></span></p>
           <p class="sig-line">DUI: <span></span></p>
           <p class="sig-line">Fecha: <span></span></p>
@@ -305,16 +311,18 @@
       </p>
 
       <p id="r-generado" class="text-xs text-slate2 mt-6 text-right"></p>
+      </div>
     </div>
 
     <details class="mt-8 text-sm" data-no-print>
       <summary class="cursor-pointer font-medium text-ink select-none">Metodología y base legal aplicada</summary>
       <div class="mt-3 space-y-2 text-slate2 leading-relaxed">
         <p>Salario básico diario (SBD) = salario mensual ÷ 30. Todas las prestaciones parten de este valor, conforme a la práctica de los Juzgados de lo Laboral (año comercial de 360 días, mes comercial de 30 días).</p>
-        <p><strong>Vacación proporcional</strong> — Arts. 177 y 187 CT: (SBD × 15 × 1.30) × (meses laborados ÷ 12).</p>
-        <p><strong>Aguinaldo proporcional</strong> — Arts. 196–198 CT: (SBD × días según antigüedad [15 / 19 / 21]) × (meses laborados ÷ 12).</p>
-        <p><strong>Indemnización por despido injustificado</strong> — Art. 58 CT: salario mensual × años, más la parte proporcional de meses; nunca menor al equivalente a 15 días de SBD. El salario usado para este cálculo no puede superar 4 veces el salario mínimo mensual del sector seleccionado.</p>
-        <p><strong>Prestación por renuncia voluntaria</strong> — Ley Reguladora de la Prestación Económica por Renuncia Voluntaria (2014): (salario mensual ÷ 2) × años, más proporcional de meses; requiere un mínimo de 2 años de servicio continuo. El salario usado no puede superar 2 veces el salario mínimo mensual del sector seleccionado.</p>
+        <p><strong>Antigüedad</strong> — si se completan la fecha de ingreso y la fecha de terminación, la antigüedad (años, meses y días exactos de calendario) se calcula automáticamente y sustituye a los campos manuales de años/meses; la fracción de año usada en los cálculos es (meses × 30 + días) ÷ 360. Si no se completan ambas fechas, se usan los campos manuales de años/meses (0 días adicionales).</p>
+        <p><strong>Vacación proporcional</strong> — Arts. 177 y 187 CT: (SBD × 15 × 1.30) × fracción de año.</p>
+        <p><strong>Aguinaldo proporcional</strong> — Arts. 196–198 CT: (SBD × días según antigüedad [15 / 19 / 21]) × fracción de año.</p>
+        <p><strong>Indemnización por despido injustificado</strong> — Art. 58 CT: salario mensual × años, más salario mensual × fracción de año; nunca menor al equivalente a 15 días de SBD. El salario usado para este cálculo no puede superar 4 veces el salario mínimo mensual del sector seleccionado.</p>
+        <p><strong>Prestación por renuncia voluntaria</strong> — Ley Reguladora de la Prestación Económica por Renuncia Voluntaria (2014): (salario mensual ÷ 2) × años, más (salario mensual ÷ 2) × fracción de año; requiere un mínimo de 2 años de servicio continuo. El salario usado no puede superar 2 veces el salario mínimo mensual del sector seleccionado.</p>
         <p><strong>Salario mínimo aplicable</strong> — vigente desde el 1 de junio de 2025 (Decreto Ejecutivo N.º 11): $408.80 comercio/servicios/industria/agroindustria/ingenios; $402.32 maquila textil; $305.23 caña de azúcar/beneficio de café; $272.53 agropecuario/pesca/recolección de café. Verifica cambios posteriores en el Ministerio de Trabajo y Previsión Social.</p>
         <p><strong>Horas extras</strong> — Art. 169 CT: valor hora ordinaria (SBD ÷ 8) × horas × 2 (recargo del 100%). Para horas extras nocturnas se añade el recargo nocturno del 25% (Arts. 168–169 CT).</p>
         <p><strong>Días de asueto</strong> — Art. 192 CT: SBD × 2 por día laborado. <strong>Descanso semanal</strong> — Arts. 175–176 CT: SBD × 1.5 por día laborado.</p>
