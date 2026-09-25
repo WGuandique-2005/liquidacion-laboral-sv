@@ -1,7 +1,12 @@
 /* ---------- Base ---------- */
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+}
 
-::selection { background: #0F6B5C; color: #fff; }
+::selection {
+  background: #0F6B5C;
+  color: #fff;
+}
 
 :focus-visible {
   outline: 2px solid #0F6B5C;
@@ -28,7 +33,10 @@
   padding-bottom: 0.4rem;
   margin: 2rem 0 0.75rem;
 }
-.doc-h3:first-of-type { margin-top: 0.5rem; }
+
+.doc-h3:first-of-type {
+  margin-top: 0.5rem;
+}
 
 /* ---------- Form fields ---------- */
 .field-label {
@@ -50,13 +58,21 @@
   color: #1B2A4A;
   transition: border-color 0.15s ease;
 }
-.field-input:hover { border-color: #b9b2a0; }
-.field-input:focus { border-color: #0F6B5C; }
+
+.field-input:hover {
+  border-color: #b9b2a0;
+}
+
+.field-input:focus {
+  border-color: #0F6B5C;
+}
+
 .field-input:disabled {
   background: #F1EFE9;
   color: #9a9689;
   cursor: not-allowed;
 }
+
 .field-input:read-only {
   background: #F3F6F4;
   border-color: #bcd7cd;
@@ -91,7 +107,11 @@
   background: #fff;
   transition: border-color 0.15s ease, background 0.15s ease;
 }
-.radio-card:hover { border-color: #b9b2a0; }
+
+.radio-card:hover {
+  border-color: #b9b2a0;
+}
+
 .radio-card:has(.peer:checked) {
   border-color: #0F6B5C;
   background: #0F6B5C0d;
@@ -106,9 +126,11 @@
   border: 1.5px solid #b9b2a0;
   position: relative;
 }
+
 .radio-card:has(.peer:checked) .radio-dot {
   border-color: #0F6B5C;
 }
+
 .radio-card:has(.peer:checked) .radio-dot::after {
   content: "";
   position: absolute;
@@ -134,6 +156,7 @@
   cursor: pointer;
   white-space: nowrap;
 }
+
 .skip-toggle input {
   width: 14px;
   height: 14px;
@@ -146,12 +169,14 @@
   grid-template-columns: 1fr 1fr;
   gap: 0.75rem 1.5rem;
 }
+
 .kv dt {
   font-size: 0.6875rem;
   text-transform: uppercase;
   letter-spacing: 0.03em;
   color: #5B6472;
 }
+
 .kv dd {
   font-size: 0.9375rem;
   color: #1B2A4A;
@@ -168,17 +193,20 @@
   padding: 0.7rem 0;
   font-size: 0.9375rem;
 }
+
 .ledger-row dt {
   color: #1B2A4A;
   display: flex;
   flex-direction: column;
 }
+
 .ledger-row dd {
   font-variant-numeric: tabular-nums;
   font-weight: 500;
   color: #1B2A4A;
   white-space: nowrap;
 }
+
 .legal-ref {
   font-size: 0.6875rem;
   color: #5B6472;
@@ -194,33 +222,42 @@
   margin-top: 0.25rem;
   padding-top: 0.75rem;
 }
+
 .total-row span:first-child {
   font-family: "Source Serif 4", Georgia, serif;
   font-weight: 600;
   font-size: 1.0625rem;
 }
+
 .total-row span:last-child {
   font-family: "Source Serif 4", Georgia, serif;
   font-weight: 600;
   font-size: 1.25rem;
   font-variant-numeric: tabular-nums;
 }
+
 .total-row--sub {
   border-top: 1px solid #D9D4C6;
 }
-.total-row--sub span:first-child, .total-row--sub span:last-child {
+
+.total-row--sub span:first-child,
+.total-row--sub span:last-child {
   font-family: "IBM Plex Sans", sans-serif;
   font-weight: 600;
   font-size: 0.9375rem;
 }
 
 /* ---------- IV. Declaración ---------- */
-.sig-block { font-size: 0.875rem; }
+.sig-block {
+  font-size: 0.875rem;
+}
+
 .sig-title {
   font-weight: 600;
   color: #1B2A4A;
   margin-bottom: 0.75rem;
 }
+
 .sig-line {
   border-bottom: 1px solid #b9b2a0;
   padding-bottom: 1.1rem;
@@ -236,19 +273,50 @@
   padding-top: 1rem;
   border-top: 1px solid #D9D4C6;
 }
-.legal-warning strong { color: #1B2A4A; }
 
-.print-only { display: none; }
-.print-only-text { display: none; }
+.legal-warning strong {
+  color: #1B2A4A;
+}
+
+.print-only {
+  display: none;
+}
+
+.print-only-text {
+  display: none;
+}
 
 /* ---------- Print ---------- */
 @media print {
-  [data-no-print] { display: none !important; }
-  body { background: #fff; }
-  .print-only { display: block !important; }
-  .print-only-text { display: inline !important; }
-  #resultado { margin-top: 0 !important; }
-  #print-area { padding: 0; }
-  .doc-h3:first-of-type { margin-top: 0; }
-  .kv-grid { grid-template-columns: 1fr 1fr 1fr 1fr; }
+  [data-no-print] {
+    display: none !important;
+  }
+
+  body {
+    background: #fff;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  .print-only-text {
+    display: inline !important;
+  }
+
+  #resultado {
+    margin-top: 0 !important;
+  }
+
+  #print-area {
+    padding: 0;
+  }
+
+  .doc-h3:first-of-type {
+    margin-top: 0;
+  }
+
+  .kv-grid {
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+  }
 }

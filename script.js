@@ -2,17 +2,33 @@
  * Calculadora de Liquidación Laboral — El Salvador
  * Fórmulas basadas en el Código de Trabajo (Decreto N° 15, 1972) y en la
  * Ley Reguladora de la Prestación Económica por Renuncia Voluntaria (2014).
- * Convención: mes comercial = 30 días, año comercial = 360 días,
- * jornada ordinaria = 8 horas (misma convención usada por los Juzgados de lo Laboral).
  *
- * Tabla de ISR actualizada al Decreto Legislativo No. 293 (abril 2025),
- * vigente desde mayo 2025 con límite exento de $550 mensuales.
+ * Convenciones (Juzgados de lo Laboral):
+ *  - Mes comercial = 30 días; año comercial = 360 días; jornada = 8 horas.
+ *  - La antigüedad INCLUYE el último día laborado: del 01/01/2015 al
+ *    30/09/2021 resultan 6 años y 9 meses.
+ *  - El aguinaldo proporcional se devenga desde el 12 de diciembre del último
+ *    aguinaldo pagado (por defecto, el 12/dic anterior a la terminación),
+ *    no desde el aniversario de ingreso (Arts. 196–198 CT).
  *
- * Las fórmulas del Bloque II (prestaciones) no se modifican al agregar
- * el Bloque III (deducciones de ley) — ver nota al final del archivo.
+ * Topes de ley: se usan contra el salario mínimo legal de referencia
+ * $408.80 (comercio, servicios e industria; Decreto Ejecutivo N.º 11,
+ * vigente desde el 1 de junio de 2025):
+ *  - Indemnización por despido (Art. 58 CT): tope 4 × SM = $1,635.20.
+ *  - Prestación por renuncia (Ley 592, Art. 4): tope 2 × SM = $817.60.
+ *
+ * Tabla de retención de ISR: Decreto Legislativo N.º 293 (30 de abril de
+ * 2025), vigente desde mayo 2025 (límite exento de $550 mensuales).
  */
 
 const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+
+const fmtFrac = (n) => {
+  let s = n.toFixed(4);
+  if (s.includes('.')) s = s.replace(/0+$/, '').replace(/\.$/, '');
+  return s;
+};
+
 const fmtDate = (isoStr) => {
   if (!isoStr) return '— No especificada —';
   const [y, m, d] = isoStr.split('-');
@@ -20,6 +36,14 @@ const fmtDate = (isoStr) => {
     'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
   return `${parseInt(d, 10)} de ${meses[parseInt(m, 10) - 1]} de ${y}`;
 };
+
+const setTxt = (id, txt) => {
+  const el = document.getElementById(id);
+  if (el) el.textContent = txt;
+};
+
+// Salario mínimo legal de referencia (solo para los topes de ley).
+const SALARIO_MINIMO_LEY = 408.80;
 
 const form = document.getElementById('calc-form');
 const errorBox = document.getElementById('error-box');
@@ -41,8 +65,15 @@ const mesesHint = document.getElementById('meses-hint');
 const fechaIngresoInput = document.getElementById('fechaIngreso');
 const fechaTerminacionInput = document.getElementById('fechaTerminacion');
 
+const toISO = (d) => {
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+};
+
 /**
- * Antigüedad exacta (años, meses, días de calendario) entre dos fechas ISO.
+ * Antigüedad exacta (años, meses, días) entre dos fechas ISO, INCLUYENDO el
+ * último día laborado (convención judicial: del 01/01/2015 al 30/09/2021
+ * resultan 6 años y 9 meses, no 6 años, 8 meses y 29 días).
  * Devuelve null si faltan datos o si la terminación no es posterior al ingreso.
  */
 function diffFechas(isoIngreso, isoTerminacion) {
@@ -59,12 +90,38 @@ function diffFechas(isoIngreso, isoTerminacion) {
     meses -= 1;
     const ultimoDiaMesAnterior = new Date(term.getFullYear(), term.getMonth(), 0).getDate();
     dias += ultimoDiaMesAnterior;
+    if (dias < 0) { // mes de ingreso de 30–31 días cruzando febrero (convención comercial)
+      meses -= 1;
+      dias += 30;
+    }
   }
   if (meses < 0) {
     anios -= 1;
     meses += 12;
   }
+
+  // El último día laborado cuenta como día de servicio:
+  dias += 1;
+  if (dias >= 30) { dias -= 30; meses += 1; }
+  if (meses >= 12) { meses -= 12; anios += 1; }
+
   return { anios, meses, dias };
+}
+
+/**
+ * Fecha base de devengo del aguinaldo: el 12 de diciembre más reciente anterior
+ * (o igual) a la terminación — presunción de último aguinaldo pagado —, salvo
+ * que el ingreso sea posterior, en cuyo caso se cuenta desde el ingreso.
+ */
+function fechaBaseAguinaldo(fechaTerminacion, fechaIngreso) {
+  const term = new Date(fechaTerminacion + 'T00:00:00');
+  let base = new Date(term.getFullYear(), 11, 12);
+  if (term < base) base = new Date(term.getFullYear() - 1, 11, 12);
+  if (fechaIngreso) {
+    const ing = new Date(fechaIngreso + 'T00:00:00');
+    if (!isNaN(ing) && ing > base) base = ing;
+  }
+  return base;
 }
 
 function sincronizarAntiguedadPorFechas() {
@@ -74,7 +131,8 @@ function sincronizarAntiguedadPorFechas() {
     mesesInput.value = calc.meses;
     aniosInput.readOnly = true;
     mesesInput.readOnly = true;
-    mesesHint.textContent = `Calculado de las fechas: ${calc.anios} años, ${calc.meses} meses y ${calc.dias} días.`;
+    mesesHint.textContent = `Calculado de las fechas: ${calc.anios} años, ${calc.meses} meses` +
+      `${calc.dias > 0 ? ` y ${calc.dias} días` : ''} (incluye el último día laborado).`;
   } else {
     aniosInput.readOnly = false;
     mesesInput.readOnly = false;
@@ -89,12 +147,6 @@ function showError(message) {
   errorBox.classList.remove('hidden');
   resultSection.classList.add('hidden');
 }
-
-const sectorSelect = document.getElementById('sectorSalarioMinimo');
-const salarioMinimoCustom = document.getElementById('salarioMinimoCustom');
-sectorSelect.addEventListener('change', () => {
-  salarioMinimoCustom.classList.toggle('hidden', sectorSelect.value !== 'custom');
-});
 
 function clearError() {
   errorBox.classList.add('hidden');
@@ -171,14 +223,12 @@ function montoEnLetras(monto) {
   return `${numeroALetras(entero).toUpperCase()} ${centavosStr}/100 DÓLARES DE LOS ESTADOS UNIDOS DE AMÉRICA`;
 }
 
-/* ---------- Tabla de retención de ISR — CORREGIDA ----------
- * Actualizada al Decreto Legislativo No. 293 (30 de abril de 2025),
- * vigente desde mayo 2025. Fuente: Ministerio de Hacienda, Dirección General de Impuestos Internos.
- * Tabla mensual para personas naturales:
+/* ---------- Tabla de retención de ISR (Art. 37 Ley de ISR, tabla mensual) ----------
+ * Decreto Legislativo N.º 293 (30 de abril de 2025), vigente desde mayo 2025:
  *   Tramo I:   $0.01    a $550.00    → Sin retención
- *   Tramo II:  $550.01  a $895.24    → Cuota fija $17.67 + 10% sobre exceso de $550.00
- *   Tramo III: $895.25  a $2,038.10  → Cuota fija $60.00 + 20% sobre exceso de $895.24
- *   Tramo IV:  $2,038.11 en adelante → Cuota fija $288.57 + 30% sobre exceso de $2,038.10
+ *   Tramo II:  $550.01  a $895.24    → Cuota fija $17.67 + 10% sobre el exceso de $550.00
+ *   Tramo III: $895.25  a $2,038.10  → Cuota fija $60.00 + 20% sobre el exceso de $895.24
+ *   Tramo IV:  $2,038.11 en adelante → Cuota fija $288.57 + 30% sobre el exceso de $2,038.10
  */
 function calcularISR(rentaGravable) {
   if (rentaGravable <= 550.00) return 0;
@@ -187,11 +237,18 @@ function calcularISR(rentaGravable) {
   return 288.57 + (rentaGravable - 2038.10) * 0.30;
 }
 
+function textoTramoISR(base) {
+  if (base <= 550.00) return 'tramo I (hasta $550.00) → exento';
+  if (base <= 895.24) return `tramo II: $17.67 + 10% × (${fmt.format(base)} − $550.00)`;
+  if (base <= 2038.10) return `tramo III: $60.00 + 20% × (${fmt.format(base)} − $895.24)`;
+  return `tramo IV: $288.57 + 30% × (${fmt.format(base)} − $2,038.10)`;
+}
+
 form.addEventListener('submit', (e) => {
   e.preventDefault();
   clearError();
 
-  // --- I. Datos de las partes ---
+  // --- I. Datos financieros y antigüedad ---
   const nombreTrabajador = document.getElementById('nombreTrabajador').value.trim();
   const patrono = document.getElementById('patrono').value.trim();
   const cargo = document.getElementById('cargo').value.trim();
@@ -203,8 +260,7 @@ form.addEventListener('submit', (e) => {
 
   // Si ambas fechas son válidas, la antigüedad (incluyendo días) se calcula de ellas
   // y tiene prioridad sobre los campos manuales de años/meses.
-  const fechasValidas = fechaIngreso && fechaTerminacion;
-  if (fechasValidas && !diffFechas(fechaIngreso, fechaTerminacion)) {
+  if (fechaIngreso && fechaTerminacion && !diffFechas(fechaIngreso, fechaTerminacion)) {
     return showError('La fecha de terminación debe ser posterior a la fecha de ingreso.');
   }
   const antiguedadPorFechas = diffFechas(fechaIngreso, fechaTerminacion);
@@ -212,20 +268,15 @@ form.addEventListener('submit', (e) => {
   const meses = antiguedadPorFechas ? antiguedadPorFechas.meses : parseInt(mesesInput.value, 10);
   const diasExtra = antiguedadPorFechas ? antiguedadPorFechas.dias : 0;
 
-  // --- II. Jornadas extraordinarias ---
+  // --- Jornadas extraordinarias y días especiales ---
   const heDiurnas = parseFloat(document.getElementById('heDiurnas').value) || 0;
   const heNocturnas = parseFloat(document.getElementById('heNocturnas').value) || 0;
   const diasAsueto = parseFloat(document.getElementById('diasAsueto').value) || 0;
   const diasDescanso = parseFloat(document.getElementById('diasDescanso').value) || 0;
 
-  const salarioMinimo = sectorSelect.value === 'custom'
-    ? parseFloat(salarioMinimoCustom.value)
-    : parseFloat(sectorSelect.value);
-
   if (!salario || salario <= 0) return showError('Ingresa un salario mensual mayor a $0.');
   if (isNaN(anios) || anios < 0) return showError('Ingresa una cantidad válida de años laborados.');
   if (isNaN(meses) || meses < 0 || meses > 11) return showError('Los meses laborados deben estar entre 0 y 11.');
-  if (!salarioMinimo || salarioMinimo <= 0) return showError('Selecciona el sector o ingresa un salario mínimo válido (se usa para el tope de ley).');
 
   // --- Salario básico diario y por hora ---
   const SBD = salario / 30;
@@ -234,35 +285,62 @@ form.addEventListener('submit', (e) => {
   const antiguedadTotal = anios + fraccionAnio;
 
   /* =========================================================
-   * BLOQUE II — Desglose de prestaciones liquidadas
-   * (fórmulas sin modificar respecto de la versión anterior)
+   * DESGLOSE DE PRESTACIONES LIQUIDADAS
    * ========================================================= */
 
+  // Vacación proporcional (corre desde el aniversario de ingreso)
   const vacacionAnual = SBD * 15 * 1.3;
   const vacacionProporcional = vacacionAnual * fraccionAnio;
 
+  // Aguinaldo proporcional (corre desde el último 12 de diciembre pagado)
   const diasAguinaldo = diasAguinaldoPorAntiguedad(anios);
   const aguinaldoAnual = SBD * diasAguinaldo;
-  const aguinaldoProporcional = aguinaldoAnual * fraccionAnio;
 
+  let fraccionAguinaldo = fraccionAnio; // aproximación sin fechas
+  let baseAguinaldoISO = null;
+  let detalleAguinaldo = null;
+  if (antiguedadPorFechas) {
+    const base = fechaBaseAguinaldo(fechaTerminacion, fechaIngreso);
+    baseAguinaldoISO = toISO(base);
+    if (baseAguinaldoISO === fechaTerminacion) {
+      fraccionAguinaldo = 0;
+      detalleAguinaldo = { anios: 0, meses: 0, dias: 0 };
+    } else {
+      const d = diffFechas(baseAguinaldoISO, fechaTerminacion);
+      if (d) {
+        detalleAguinaldo = d;
+        fraccionAguinaldo = (d.anios * 360 + d.meses * 30 + d.dias) / 360;
+      }
+    }
+  }
+  const aguinaldoProporcional = aguinaldoAnual * fraccionAguinaldo;
+
+  // Indemnización (despido) o prestación por renuncia, con topes de ley
   let montoCausa = 0;
   let notaCausa = '';
   let etiquetaCausa = '';
   let legalCausa = '';
   let exentoNota = '';
+  let topeCausa = 0;
+  let baseAnualCausa = 0;
+  let minimoLegal = 0;
+  let aplicaMinimo = false;
 
   if (causa === 'despido') {
     etiquetaCausa = 'Indemnización por despido injustificado';
     legalCausa = 'Art. 58 CT';
     exentoNota = 'indemnización y aguinaldo';
-    const topeIndemnizacion = salarioMinimo * 4;
-    const salarioBase = Math.min(salario, topeIndemnizacion);
-    const base = salarioBase; // SBD_capado × 30 = salario base capado
-    montoCausa = base * anios + base * fraccionAnio;
-    const minimo = SBD * 15;
-    if (montoCausa < minimo) montoCausa = minimo;
-    if (salario > topeIndemnizacion) {
-      notaCausa = `Se aplicó el tope legal de 4 salarios mínimos (${fmt.format(topeIndemnizacion)}) porque el salario ingresado lo supera (Art. 58 CT).`;
+    topeCausa = SALARIO_MINIMO_LEY * 4;
+    const salarioBase = Math.min(salario, topeCausa);
+    baseAnualCausa = salarioBase; // SBD_capado × 30 = salario base capado
+    montoCausa = salarioBase * anios + salarioBase * fraccionAnio;
+    minimoLegal = SBD * 15;
+    if (montoCausa < minimoLegal) {
+      montoCausa = minimoLegal;
+      aplicaMinimo = true;
+    }
+    if (salario > topeCausa) {
+      notaCausa = `Se aplicó el tope legal de 4 salarios mínimos (${fmt.format(topeCausa)}; salario mínimo de referencia ${fmt.format(SALARIO_MINIMO_LEY)} — comercio, servicios e industria) porque el salario ingresado lo supera (Art. 58 CT).`;
     }
   } else {
     etiquetaCausa = 'Prestación económica por renuncia voluntaria';
@@ -272,12 +350,12 @@ form.addEventListener('submit', (e) => {
       montoCausa = 0;
       notaCausa = 'No aplica: la Ley Reguladora de la Prestación Económica por Renuncia Voluntaria exige un mínimo de 2 años de servicio continuo (Art. 2).';
     } else {
-      const topeRenuncia = salarioMinimo * 2;
-      const salarioBase = Math.min(salario, topeRenuncia);
-      const base = salarioBase / 30 * 15; // SBD_capado × 15
-      montoCausa = base * anios + base * fraccionAnio;
-      if (salario > topeRenuncia) {
-        notaCausa = `Se aplicó el tope legal de 2 salarios mínimos (${fmt.format(topeRenuncia)}) porque el salario ingresado lo supera (Ley de Renuncia Voluntaria, Art. 4).`;
+      topeCausa = SALARIO_MINIMO_LEY * 2;
+      const salarioBase = Math.min(salario, topeCausa);
+      baseAnualCausa = salarioBase / 30 * 15; // SBD_capado × 15
+      montoCausa = baseAnualCausa * anios + baseAnualCausa * fraccionAnio;
+      if (salario > topeCausa) {
+        notaCausa = `Se aplicó el tope legal de 2 salarios mínimos (${fmt.format(topeCausa)}; salario mínimo de referencia ${fmt.format(SALARIO_MINIMO_LEY)} — comercio, servicios e industria) porque el salario ingresado lo supera (Ley de Renuncia Voluntaria, Art. 4).`;
       }
     }
   }
@@ -291,8 +369,7 @@ form.addEventListener('submit', (e) => {
     subtotalHeDiurnas + subtotalHeNocturnas + montoAsueto + montoDescanso;
 
   /* =========================================================
-   * BLOQUE III — Deducciones de ley y neto a pagar
-   * (ISR corregido con tabla vigente desde mayo 2025)
+   * DEDUCCIONES DE LEY Y NETO A PAGAR
    * ========================================================= */
 
   const montoExento = montoCausa + aguinaldoProporcional;
@@ -313,7 +390,7 @@ form.addEventListener('submit', (e) => {
   const montoNeto = totalDevengado - totalDeducciones;
 
   /* =========================================================
-   * Pintar I. Datos de las partes
+   * Pintar I. Datos de las partes (comprobante)
    * ========================================================= */
   document.getElementById('r-nombreTrabajador').textContent = nombreTrabajador || '— No especificada —';
   document.getElementById('r-patrono').textContent = patrono || '— No especificado —';
@@ -367,6 +444,113 @@ form.addEventListener('submit', (e) => {
   document.getElementById('r-generado').textContent =
     `Generado el ${ahora.toLocaleDateString('es-SV')} ${ahora.toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' })}`;
 
+  /* =========================================================
+   * Metodología dinámica: fórmulas con los datos del usuario
+   * ========================================================= */
+
+  // 1–3. Bases
+  setTxt('m-sbd-calc', fmt.format(salario));
+  setTxt('m-sbd', fmt.format(SBD));
+  setTxt('m-h-calc', fmt.format(SBD));
+  setTxt('m-h', fmt.format(H));
+  setTxt('m-antiguedad',
+    `${anios} año${anios === 1 ? '' : 's'}, ${meses} mes${meses === 1 ? '' : 'es'}${diasExtra > 0 ? ` y ${diasExtra} día${diasExtra === 1 ? '' : 's'}` : ''}`);
+  setTxt('m-fraccion-calc', `(${meses} × 30 + ${diasExtra}) ÷ 360`);
+  setTxt('m-fraccion', fmtFrac(fraccionAnio));
+
+  // 4. Vacación
+  setTxt('m-vac-calc', `${fmt.format(SBD)} × 15 × 1.30`);
+  setTxt('m-fraccion2', fmtFrac(fraccionAnio));
+  setTxt('m-vac', fmt.format(vacacionProporcional));
+
+  // 5. Aguinaldo
+  setTxt('m-agu-cat',
+    `${diasAguinaldo} días de salario (${anios} año${anios === 1 ? '' : 's'} de servicio → ` +
+    `${anios < 3 ? 'categoría 1: menos de 3 años' : anios <= 10 ? 'categoría 2: de 3 a 10 años' : 'categoría 3: más de 10 años'})`);
+  if (antiguedadPorFechas && baseAguinaldoISO) {
+    if (baseAguinaldoISO === fechaIngreso) {
+      setTxt('m-agu-base', `desde la fecha de ingreso (${fmtDate(baseAguinaldoISO)}), por ser posterior al último 12 de diciembre`);
+    } else {
+      setTxt('m-agu-base', `desde el ${fmtDate(baseAguinaldoISO)} (presunción: fecha del último aguinaldo pagado)`);
+    }
+    setTxt('m-agu-detalle',
+      `${detalleAguinaldo.meses} mes${detalleAguinaldo.meses === 1 ? '' : 'es'} y ${detalleAguinaldo.dias} día${detalleAguinaldo.dias === 1 ? '' : 's'} ` +
+      `→ (${detalleAguinaldo.meses} × 30 + ${detalleAguinaldo.dias}) ÷ 360`);
+  } else {
+    setTxt('m-agu-base', 'no se especificaron ambas fechas → se aproxima con la fracción de antigüedad (completa las fechas para el cálculo exacto desde el 12 de diciembre)');
+    setTxt('m-agu-detalle', `${meses} mes${meses === 1 ? '' : 'es'} → (${meses} × 30 + 0) ÷ 360`);
+  }
+  setTxt('m-agu-fraccion', fmtFrac(fraccionAguinaldo));
+  setTxt('m-agu-fraccion2', fmtFrac(fraccionAguinaldo));
+  setTxt('m-agu-calc', `${fmt.format(SBD)} × ${diasAguinaldo}`);
+  setTxt('m-agu', fmt.format(aguinaldoProporcional));
+
+  // 6. Indemnización o prestación por renuncia
+  setTxt('m-causa-nombre', etiquetaCausa);
+  setTxt('m-causa-legal', legalCausa);
+  let topeTxt;
+  if (causa === 'despido') {
+    topeTxt = `Tope legal (Art. 58 CT): 4 × salario mínimo = 4 × ${fmt.format(SALARIO_MINIMO_LEY)} = ${fmt.format(topeCausa)}. `;
+    topeTxt += salario > topeCausa
+      ? `El salario de ${fmt.format(salario)} lo supera → se usa capado en ${fmt.format(topeCausa)}.`
+      : `El salario de ${fmt.format(salario)} no lo supera → se usa íntegro.`;
+    setTxt('m-causa-requisito', '');
+  } else {
+    const reqTxt = `Requisito (Art. 2): mínimo 2 años de servicio continuo → la antigüedad total de ${fmtFrac(antiguedadTotal)} años ${antiguedadTotal < 2 ? 'NO lo cumple → la prestación es $0.00.' : 'lo cumple.'} `;
+    setTxt('m-causa-requisito', reqTxt);
+    if (antiguedadTotal < 2) {
+      topeTxt = '';
+    } else {
+      topeTxt = `Tope legal (Art. 4): 2 × salario mínimo = 2 × ${fmt.format(SALARIO_MINIMO_LEY)} = ${fmt.format(topeCausa)}. `;
+      topeTxt += salario > topeCausa
+        ? `El salario de ${fmt.format(salario)} lo supera → se usa capado en ${fmt.format(topeCausa)}.`
+        : `El salario de ${fmt.format(salario)} no lo supera → se usa íntegro.`;
+    }
+  }
+  setTxt('m-causa-tope', topeTxt);
+  if (causa === 'despido') {
+    setTxt('m-causa-calc', `${fmt.format(baseAnualCausa)} × (${anios} + ${fmtFrac(fraccionAnio)})`);
+  } else if (antiguedadTotal < 2) {
+    setTxt('m-causa-calc', 'no aplica');
+  } else {
+    setTxt('m-causa-calc', `${fmt.format(baseAnualCausa)} × (${anios} + ${fmtFrac(fraccionAnio)})`);
+  }
+  setTxt('m-causa-monto', fmt.format(montoCausa));
+  if (causa === 'despido') {
+    setTxt('m-causa-minimo', aplicaMinimo
+      ? ` Mínimo legal (Art. 58 CT): 15 días de SBD = ${fmt.format(minimoLegal)}; el cálculo directo era menor → se elevó al mínimo.`
+      : ` Mínimo legal (Art. 58 CT): 15 días de SBD = ${fmt.format(minimoLegal)}; el resultado lo supera → no aplica el ajuste.`);
+  } else {
+    setTxt('m-causa-minimo', '');
+  }
+
+  // 7–10. Jornadas extraordinarias y días especiales
+  setTxt('m-hed-calc', `${fmt.format(H)} × ${heDiurnas} × 2`);
+  setTxt('m-hed', fmt.format(subtotalHeDiurnas));
+  setTxt('m-hen-calc', `${fmt.format(H)} × ${heNocturnas} × 2 × 1.25`);
+  setTxt('m-hen', fmt.format(subtotalHeNocturnas));
+  setTxt('m-asu-calc', `${fmt.format(SBD)} × 2 × ${diasAsueto}`);
+  setTxt('m-asu', fmt.format(montoAsueto));
+  setTxt('m-des-calc', `${fmt.format(SBD)} × 1.5 × ${diasDescanso}`);
+  setTxt('m-des', fmt.format(montoDescanso));
+
+  // 11. Total
+  setTxt('m-total', fmt.format(totalDevengado));
+
+  // 12–16. Deducciones
+  setTxt('m-exento', fmt.format(montoExento));
+  setTxt('m-gravada', fmt.format(remuneracionGravada));
+  setTxt('m-isss-base', fmt.format(baseISSS));
+  setTxt('m-isss', fmt.format(cotizacionISSS));
+  setTxt('m-afp-base', fmt.format(remuneracionGravada));
+  setTxt('m-afp', fmt.format(cotizacionAFP));
+  setTxt('m-isr-base', fmt.format(baseISR));
+  setTxt('m-isr-tramo', textoTramoISR(baseISR));
+  setTxt('m-isr', fmt.format(retencionISR));
+  setTxt('m-neto-calc',
+    `${fmt.format(totalDevengado)} − (${fmt.format(cotizacionISSS)} + ${fmt.format(cotizacionAFP)} + ${fmt.format(retencionISR)})`);
+  setTxt('m-neto', fmt.format(montoNeto));
+
   resultSection.classList.remove('hidden');
   resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
@@ -375,19 +559,13 @@ document.getElementById('btn-print').addEventListener('click', () => window.prin
 
 /**
  * Nota: las fórmulas de vacación, aguinaldo, indemnización/renuncia, horas
- * extras, asueto y descanso semanal (Bloque II) son idénticas a las de la
- * versión anterior de esta calculadora y fueron validadas contra el
- * Código de Trabajo de El Salvador vigente.
+ * extras, asueto y descanso semanal (Bloque de prestaciones) son las del
+ * Código de Trabajo de El Salvador y de la Ley Reguladora de la Prestación
+ * Económica por Renuncia Voluntaria (Decreto N.º 592, 2014).
  *
- * CORRECCIÓN APLICADA (septiembre 2026): La tabla de retención de ISR
- * fue actualizada al Decreto Legislativo No. 293 del 30 de abril de 2025,
- * vigente desde mayo 2025. Los cambios principales son:
- *   - Límite exento: $550.00 (antes $472.00)
- *   - Cuota fija tramo II: $17.67 (antes $42.32)
- *   - Cuota fija tramo III: $60.00 (antes se calculaba incorrectamente)
- *   - Cuota fija tramo IV: $288.57 (antes $271.90)
- *
- * El Bloque III mantiene la separación entre renta gravada/exenta y
- * las deducciones de ISSS, AFP e ISR para obtener el monto neto a pagar,
- * ahora con la tabla de ISR correcta y vigente.
+ * El aguinaldo proporcional se devenga desde el 12 de diciembre del último
+ * pago (convención del caso guía de los Juzgados de lo Laboral: del
+ * 12/12/2020 al 30/09/2021 = 9 meses y 19 días = 289 días).
+ * La antigüedad incluye el último día laborado.
+ * La tabla de ISR corresponde al Decreto Legislativo N.º 293 (abril 2025).
  */
