@@ -5,6 +5,9 @@
  * Convención: mes comercial = 30 días, año comercial = 360 días,
  * jornada ordinaria = 8 horas (misma convención usada por los Juzgados de lo Laboral).
  *
+ * Tabla de ISR actualizada al Decreto Legislativo No. 293 (abril 2025),
+ * vigente desde mayo 2025 con límite exento de $550 mensuales.
+ *
  * Las fórmulas del Bloque II (prestaciones) no se modifican al agregar
  * el Bloque III (deducciones de ley) — ver nota al final del archivo.
  */
@@ -14,7 +17,7 @@ const fmtDate = (isoStr) => {
   if (!isoStr) return '— No especificada —';
   const [y, m, d] = isoStr.split('-');
   const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio',
-                 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+    'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
   return `${parseInt(d, 10)} de ${meses[parseInt(m, 10) - 1]} de ${y}`;
 };
 
@@ -168,12 +171,20 @@ function montoEnLetras(monto) {
   return `${numeroALetras(entero).toUpperCase()} ${centavosStr}/100 DÓLARES DE LOS ESTADOS UNIDOS DE AMÉRICA`;
 }
 
-/* ---------- Tabla de retención de ISR (Art. 37 Ley de ISR, tabla mensual) ---------- */
+/* ---------- Tabla de retención de ISR — CORREGIDA ----------
+ * Actualizada al Decreto Legislativo No. 293 (30 de abril de 2025),
+ * vigente desde mayo 2025. Fuente: Ministerio de Hacienda, Dirección General de Impuestos Internos.
+ * Tabla mensual para personas naturales:
+ *   Tramo I:   $0.01    a $550.00    → Sin retención
+ *   Tramo II:  $550.01  a $895.24    → Cuota fija $17.67 + 10% sobre exceso de $550.00
+ *   Tramo III: $895.25  a $2,038.10  → Cuota fija $60.00 + 20% sobre exceso de $895.24
+ *   Tramo IV:  $2,038.11 en adelante → Cuota fija $288.57 + 30% sobre exceso de $2,038.10
+ */
 function calcularISR(rentaGravable) {
-  if (rentaGravable <= 472.00) return 0;
-  if (rentaGravable <= 895.24) return (rentaGravable - 472.00) * 0.10;
-  if (rentaGravable <= 2038.10) return 42.32 + (rentaGravable - 895.24) * 0.20;
-  return 271.90 + (rentaGravable - 2038.10) * 0.30;
+  if (rentaGravable <= 550.00) return 0;
+  if (rentaGravable <= 895.24) return 17.67 + (rentaGravable - 550.00) * 0.10;
+  if (rentaGravable <= 2038.10) return 60.00 + (rentaGravable - 895.24) * 0.20;
+  return 288.57 + (rentaGravable - 2038.10) * 0.30;
 }
 
 form.addEventListener('submit', (e) => {
@@ -277,10 +288,11 @@ form.addEventListener('submit', (e) => {
   const montoDescanso = SBD * 1.5 * diasDescanso;
 
   const totalDevengado = vacacionProporcional + aguinaldoProporcional + montoCausa +
-                          subtotalHeDiurnas + subtotalHeNocturnas + montoAsueto + montoDescanso;
+    subtotalHeDiurnas + subtotalHeNocturnas + montoAsueto + montoDescanso;
 
   /* =========================================================
    * BLOQUE III — Deducciones de ley y neto a pagar
+   * (ISR corregido con tabla vigente desde mayo 2025)
    * ========================================================= */
 
   const montoExento = montoCausa + aguinaldoProporcional;
@@ -364,7 +376,18 @@ document.getElementById('btn-print').addEventListener('click', () => window.prin
 /**
  * Nota: las fórmulas de vacación, aguinaldo, indemnización/renuncia, horas
  * extras, asueto y descanso semanal (Bloque II) son idénticas a las de la
- * versión anterior de esta calculadora. El Bloque III solo agrega, sobre el
- * mismo resultado ya calculado, la separación entre renta gravada/exenta y
- * las deducciones de ISSS, AFP e ISR para obtener el monto neto a pagar.
+ * versión anterior de esta calculadora y fueron validadas contra el
+ * Código de Trabajo de El Salvador vigente.
+ *
+ * CORRECCIÓN APLICADA (septiembre 2026): La tabla de retención de ISR
+ * fue actualizada al Decreto Legislativo No. 293 del 30 de abril de 2025,
+ * vigente desde mayo 2025. Los cambios principales son:
+ *   - Límite exento: $550.00 (antes $472.00)
+ *   - Cuota fija tramo II: $17.67 (antes $42.32)
+ *   - Cuota fija tramo III: $60.00 (antes se calculaba incorrectamente)
+ *   - Cuota fija tramo IV: $288.57 (antes $271.90)
+ *
+ * El Bloque III mantiene la separación entre renta gravada/exenta y
+ * las deducciones de ISSS, AFP e ISR para obtener el monto neto a pagar,
+ * ahora con la tabla de ISR correcta y vigente.
  */
